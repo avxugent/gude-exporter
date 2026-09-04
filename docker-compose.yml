@@ -1,0 +1,13 @@
+services:
+  gude-exporter:
+    image: kristofkeppens/gude-exporter:latest
+    container_name: gude-exporter
+    restart: unless-stopped
+    ports:
+      - "9880:9880"
+    volumes:
+      # Optional: mount a custom config to override the built-in default.
+      # Remove or comment out this line to use the image's default config.
+      - ./config.yaml:/etc/gude-exporter/config.yaml:ro
+    # Optional: override log level at runtime
+    # command: ["--log-level", "DEBUG"]

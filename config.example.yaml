@@ -1,0 +1,71 @@
+# gude-exporter example configuration
+# Copy this file to config.yaml and adjust to your environment.
+
+# ── HTTP server ───────────────────────────────────────────────────────────────
+
+# Address the HTTP server listens on.
+listen_host: "0.0.0.0"
+
+# Port the HTTP server listens on.
+listen_port: 9880
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+
+# Minimum log level: DEBUG | INFO | WARNING | ERROR | CRITICAL
+log_level: INFO
+
+# ── Devices ───────────────────────────────────────────────────────────────────
+
+# List of Gude Expert Power Control (EPC) devices to monitor (switched and/or
+# outlet-metered PDUs, e.g. EPC 8035). This list is OPTIONAL. When left empty
+# (or omitted entirely) the exporter operates in URL-parameter mode only:
+# every probe request must supply the target device via query parameters, e.g.:
+#
+#   GET /probe?host=192.168.1.10&name=pdu-rack-3&username=admin&password=secret
+#
+# When devices ARE listed here they are probed on every plain GET /probe
+# request (config-file mode). URL-parameter mode is always available alongside
+# config-file mode regardless of whether devices are listed below.
+#
+# Supported query parameters (all except 'host' are optional):
+#   host          Hostname or IP address of the device        (required)
+#   name          Label used in Prometheus metrics             (default: value of host)
+#   port          HTTP(S) port                                 (default: 80, or 443 if scheme=https)
+#   scheme        "http" or "https"                            (default: http)
+#   timeout       Request timeout in seconds                   (default: 10.0)
+#   username      Gude login username, plaintext fallback      (default: none)
+#   password      Gude login password, plaintext fallback      (default: none)
+#   verify_tls    "true"/"false" — verify the device's TLS
+#                 certificate (only relevant when scheme=https) (default: false)
+#
+# The exporter talks to the device's HTTP/JSON status interface
+# (statusjsn.js), authenticated with the same username/password used to log
+# into the device's web UI. Plain HTTP on port 80 is the default, matching
+# Gude's own documentation and typical deployment on an isolated management
+# VLAN; set scheme: https per device for units with TLS configured on their
+# management interface (verify_tls defaults to false since these devices
+# typically carry a self-signed certificate out of the box).
+#
+# Credentials: OpenBao is tried first for every device, keyed by hostname
+# (see bao.py / README "Credentials" section). The 'username'/'password'
+# fields below (or the matching URL params) are only used when that lookup
+# returns nothing — fine for a lab/test device, but for anything else prefer
+# OpenBao so credentials aren't sitting in this file.
+#
+#   bao kv put secret/gude/192.168.1.10 username=admin password=secret
+
+# devices:
+#   - name: pdu-rack-3           # Unique label used in all Prometheus metrics
+#     host: 192.168.1.10         # Hostname or IP address of the device
+#     scheme: http                # "http" or "https"
+#     port: 80                    # HTTP(S) port
+#     timeout: 10.0                # Request timeout in seconds
+#     username: ""                 # Plaintext fallback; prefer OpenBao instead
+#     password: ""                 # Plaintext fallback; prefer OpenBao instead
+#     verify_tls: false            # Set true once the device has a trusted cert (scheme: https only)
+
+#   - name: pdu-rack-4
+#     host: 192.168.1.11
+#     scheme: http
+#     port: 80
+#     timeout: 10.0
