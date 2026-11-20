@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
 # Build and push the gude-exporter Docker image (linux/amd64 + linux/arm64)
-# to Docker Hub as kristofkeppens/gude-exporter.
+# to GitHub Container Registry as ghcr.io/avxugent/gude-exporter.
 #
-# Requires: docker buildx, and `docker login` already done for an account
-# with push access to kristofkeppens/gude-exporter.
+# Requires: docker buildx, and `docker login ghcr.io` already done (a PAT with
+# write:packages) for an account with push access to ghcr.io/avxugent/gude-exporter.
 #
 # Usage:
 #   ./build-and-push.sh            # tags :latest and :<git-short-sha>
@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-IMAGE="kristofkeppens/gude-exporter"
+IMAGE="ghcr.io/avxugent/gude-exporter"
 PLATFORMS="linux/amd64,linux/arm64"
 BUILDER="gude-exporter-builder"
 
