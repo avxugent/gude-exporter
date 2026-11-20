@@ -26,7 +26,7 @@ Two response shapes matter here, both requested via the ``components`` bitmask
                          "fields": [{"name": ..., "unit": ..., "decPrecision": ...}, ...],
                          "properties": [{"id": ..., "name": ...}, ...]}   # one per instance
     sensor_values[i] = {"type": <int>, "num": <int>,
-                         "values": [[{"v": ...}, ...], ...]}              # instance -> field -> reading
+                         "values": [[{"v": ...}, ...], ...]}          # instance -> field -> reading
 
   ``properties[j]`` describes instance ``j`` (e.g. outlet 3); ``values[j][k]``
   is that instance's reading for ``fields[k]`` (e.g. Voltage). Field *names* and
@@ -52,11 +52,10 @@ import base64
 import http.client
 import json
 import logging
-import socket
 import ssl
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,7 @@ class ProbeResult:
     """Result of probing a single Gude EPC device."""
 
     success: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     duration_seconds: float = 0.0
 
     outlets: list[OutletReading] = field(default_factory=list)
@@ -251,7 +250,7 @@ def probe_device(
     host: str,
     username: str,
     password: str,
-    port: Optional[int] = None,
+    port: int | None = None,
     scheme: str = "http",
     timeout: float = 10.0,
     verify_tls: bool = False,
@@ -275,7 +274,7 @@ def probe_device(
     if port is None:
         port = DEFAULT_HTTPS_PORT if scheme == "https" else DEFAULT_HTTP_PORT
 
-    auth = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+    auth = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
     headers = {"Authorization": f"Basic {auth}", "Accept": "application/json"}
     path = f"/statusjsn.js?components={_COMPONENTS}"
 
@@ -325,8 +324,7 @@ def probe_device(
         finally:
             conn.close()
 
-    except (OSError, socket.timeout, http.client.HTTPException, json.JSONDecodeError,
-            _ProtocolError) as exc:
+    except (OSError, http.client.HTTPException, json.JSONDecodeError, _ProtocolError) as exc:
         result.error = str(exc)
         logger.warning("Probe failed for %s:%d: %s", host, port, exc)
     finally:

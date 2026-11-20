@@ -1,5 +1,15 @@
 # Gude Exporter
 
+[![CI](https://github.com/avxugent/gude-exporter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/avxugent/gude-exporter/actions/workflows/github-code-scanning/codeql/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/security/code-scanning)
+[![Docker build](https://github.com/avxugent/gude-exporter/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/actions/workflows/docker.yml)
+[![Docker Hub](https://img.shields.io/badge/docker%20hub-kristofkeppens%2Fgude--exporter-2496ed?logo=docker&logoColor=white)](https://hub.docker.com/r/kristofkeppens/gude-exporter)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/avxugent/gude-exporter/security/dependabot)
+[![Trivy](https://img.shields.io/badge/image%20scan-trivy-1904da?logo=aqua&logoColor=white)](https://github.com/avxugent/gude-exporter/actions/workflows/ci.yml)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)
+![Code style: ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff)
+[![License: MIT](https://img.shields.io/github/license/avxugent/gude-exporter)](LICENSE)
+
 A Prometheus exporter for [Gude](https://gude-systems.com/) Expert Power Control (EPC) PDUs,
 written in Python — targets the EPC 8035 series (8-outlet switched and outlet-metered PDU), but
 generic across Gude's EPC line since it reads the device's own self-described sensor schema rather
@@ -158,3 +168,33 @@ the default Python/process collectors.
   design (in particular, the self-describing `gude_sensor_value` metric and the best-effort
   `gude_device_info`). If you have a real device, checking a `/probe` response against it and
   filing corrections is the single most useful thing to do next.
+
+## Development
+
+```bash
+pip install -r requirements-dev.txt
+ruff check .                      # lint, includes bandit (S) security rules
+pytest --cov                      # unit + stub-device tests (no real PDU needed)
+scripts/smoke-test.sh             # starts the real exporter against a stub device
+pip-audit -r requirements.txt     # known-vulnerable dependencies
+```
+
+The tests serve a canned `statusjsn.js` response from a local stub HTTP server, so they exercise
+the real `http.client` code path. They are shaped from Gude's documentation, **not** captured from
+a physical EPC-8035 — see `CLAUDE.md`.
+
+### CI and security scanning
+
+| Check | Where | What it covers |
+|---|---|---|
+| Ruff | `ci.yml` | lint + static security rules (flake8-bandit) |
+| pytest | `ci.yml` | Python 3.10–3.14 matrix, with coverage |
+| Smoke test | `ci.yml` | real process, endpoints, graceful SIGTERM |
+| pip-audit | `ci.yml` (weekly too) | known CVEs in `requirements.txt` |
+| Trivy | `ci.yml` (weekly too) | fixable HIGH/CRITICAL CVEs in the Docker image; SARIF goes to the Security tab |
+| CodeQL | GitHub default setup (repo settings) | static analysis of the Python code and workflows |
+| Dependency review | `dependency-review.yml` | blocks PRs that add dependencies with high-severity CVEs |
+| Dependabot | `dependabot.yml` | weekly PRs for pip, Docker base image and GitHub Actions |
+
+`docker.yml` only publishes an image after the whole CI workflow has passed, and rebuilds weekly to
+pick up base-image fixes.
