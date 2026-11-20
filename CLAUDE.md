@@ -65,7 +65,7 @@ from a real EPC-8035, so passing tests don't prove field names are right — see
 
 CI (`.github/workflows/`): `ci.yml` (ruff, pytest matrix 3.10–3.14, smoke test, pip-audit, Trivy
 image scan; also runs weekly and is reused by `docker.yml` so images are only published from a
-green build), `codeql.yml`, `dependency-review.yml`, plus `dependabot.yml`. `docker.yml` builds and
+green build), `dependency-review.yml`, plus `dependabot.yml`. CodeQL runs via GitHub's *default setup* (repo settings), not a workflow file — an advanced `codeql.yml` is rejected while default setup is enabled. `docker.yml` builds and
 pushes the multiarch image to Docker Hub on push to `main`.
 
 ## Architecture

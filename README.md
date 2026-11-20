@@ -1,7 +1,7 @@
 # Gude Exporter
 
 [![CI](https://github.com/avxugent/gude-exporter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/avxugent/gude-exporter/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/avxugent/gude-exporter/actions/workflows/github-code-scanning/codeql/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/security/code-scanning)
 [![Docker build](https://github.com/avxugent/gude-exporter/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/avxugent/gude-exporter/actions/workflows/docker.yml)
 [![Docker Hub](https://img.shields.io/badge/docker%20hub-kristofkeppens%2Fgude--exporter-2496ed?logo=docker&logoColor=white)](https://hub.docker.com/r/kristofkeppens/gude-exporter)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025e8c?logo=dependabot)](https://github.com/avxugent/gude-exporter/security/dependabot)
@@ -192,7 +192,7 @@ a physical EPC-8035 — see `CLAUDE.md`.
 | Smoke test | `ci.yml` | real process, endpoints, graceful SIGTERM |
 | pip-audit | `ci.yml` (weekly too) | known CVEs in `requirements.txt` |
 | Trivy | `ci.yml` (weekly too) | fixable HIGH/CRITICAL CVEs in the Docker image; SARIF goes to the Security tab |
-| CodeQL | `codeql.yml` | `security-extended` static analysis of the Python code |
+| CodeQL | GitHub default setup (repo settings) | static analysis of the Python code and workflows |
 | Dependency review | `dependency-review.yml` | blocks PRs that add dependencies with high-severity CVEs |
 | Dependabot | `dependabot.yml` | weekly PRs for pip, Docker base image and GitHub Actions |
 
