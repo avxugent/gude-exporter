@@ -36,7 +36,7 @@ a bespoke line protocol (pjlink).
 ## Commands
 
 ```bash
-# Install deps (PyYAML, prometheus-client, hvac)
+# Install runtime deps (PyYAML, prometheus-client, hvac)
 pip install -r requirements.txt
 
 # Run locally
@@ -51,15 +51,22 @@ docker build -t gude-exporter .
 docker compose up -d
 ```
 
-There is **no test suite, linter, or type-checker configured** in this repo (matching the rest of
-the fleet). The only CI job (`.github/workflows/docker.yml`) builds and pushes a multiarch Docker
-image to Docker Hub on push to `main`. Verify changes by running the exporter and curling its
-endpoints — ideally against a real EPC-8035
-(`GET /probe?host=...&username=...&password=...`), since nothing here has been. Absent a real
-device, at minimum stand up a stub HTTP server returning a canned `statusjsn.js` body (shaped per
-`prober.py`'s docstring) and confirm `probe_device()` parses it as expected — there's no pure
-JSON-parsing entry point separate from the HTTP I/O, same limitation `lw3-exporter` notes for its
-own prober.
+```bash
+pip install -r requirements-dev.txt
+ruff check .                    # lint (+ bandit security rules), config in pyproject.toml
+pytest --cov                    # tests/ — stub HTTP server serving a canned statusjsn.js
+scripts/smoke-test.sh           # real exporter process vs. a stub device; also checks SIGTERM
+pip-audit -r requirements.txt
+```
+
+Tests live in `tests/`; `conftest.py` has the `stub_device` fixture (a real local HTTP server
+whose response is set per test). The canned response is shaped from Gude's docs, **not** captured
+from a real EPC-8035, so passing tests don't prove field names are right — see the top of this file.
+
+CI (`.github/workflows/`): `ci.yml` (ruff, pytest matrix 3.10–3.14, smoke test, pip-audit, Trivy
+image scan; also runs weekly and is reused by `docker.yml` so images are only published from a
+green build), `codeql.yml`, `dependency-review.yml`, plus `dependabot.yml`. `docker.yml` builds and
+pushes the multiarch image to Docker Hub on push to `main`.
 
 ## Architecture
 

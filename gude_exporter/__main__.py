@@ -51,10 +51,12 @@ Endpoints
 from __future__ import annotations
 
 import argparse
+import html
 import logging
 import os
 import signal
 import sys
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -63,11 +65,11 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
+    REGISTRY,
     CollectorRegistry,
     Counter,
     Histogram,
     generate_latest,
-    REGISTRY,
 )
 
 from . import bao
@@ -121,7 +123,7 @@ def load_config(path: str) -> dict[str, Any]:
     """
     cfg = dict(_DEFAULT_CONFIG)
 
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
 
     cfg.update(data)
@@ -211,8 +213,9 @@ def _make_handler(cfg: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
             """Render a minimal HTML landing page with application info."""
             num_devices = len(cfg["devices"])
             device_rows = "".join(
-                f"<tr><td>{dev['name']}</td><td>{dev['host']}</td>"
-                f"<td>{dev['scheme']}</td><td>{dev['port'] or ''}</td></tr>"
+                f"<tr><td>{html.escape(str(dev['name']))}</td>"
+                f"<td>{html.escape(str(dev['host']))}</td>"
+                f"<td>{html.escape(str(dev['scheme']))}</td><td>{dev['port'] or ''}</td></tr>"
                 for dev in cfg["devices"]
             )
             device_section = (
@@ -467,7 +470,9 @@ def main(argv: list[str] | None = None) -> None:
     # --- Graceful shutdown ---
     def _handle_signal(signum: int, _frame: Any) -> None:
         logger.info("Received signal %d, shutting down…", signum)
-        httpd.shutdown()
+        # shutdown() blocks until serve_forever() returns; calling it directly
+        # here would deadlock since the handler runs on the serve_forever thread.
+        threading.Thread(target=httpd.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)

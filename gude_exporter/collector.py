@@ -10,7 +10,8 @@ Prometheus metrics.
 from __future__ import annotations
 
 import logging
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, Metric
 
