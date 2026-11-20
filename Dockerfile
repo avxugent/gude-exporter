@@ -24,9 +24,9 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /usr/local/lib/python3.12/site-packages/pip \
-              /usr/local/lib/python3.12/site-packages/pip-*.dist-info \
-              /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.12
+    && rm -rf /usr/local/lib/python3*/site-packages/pip \
+              /usr/local/lib/python3*/site-packages/pip-*.dist-info \
+              /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.*
 
 # Copy installed packages from the builder stage
 COPY --from=builder /install /usr/local
