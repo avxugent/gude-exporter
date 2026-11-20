@@ -14,7 +14,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="gude-exporter" \
       org.opencontainers.image.description="Prometheus exporter for Gude Expert Power Control (EPC) PDUs" \
-      org.opencontainers.image.source="https://github.com/kristofkeppens/gude-exporter"
+      org.opencontainers.image.source="https://github.com/avxugent/gude-exporter"
 
 WORKDIR /app
 
