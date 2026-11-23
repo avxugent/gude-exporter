@@ -175,6 +175,31 @@ the default Python/process collectors.
   `gude_device_info`). If you have a real device, checking a `/probe` response against it and
   filing corrections is the single most useful thing to do next.
 
+## Access control
+
+Both restrictions are optional and default to off (open, with a startup warning). `/healthz` is
+never restricted.
+
+- **`allowed_clients`** — IPs/CIDRs that may call `/`, `/probe` and `/metrics`; others get `403`.
+  The `GUDE_ALLOWED_CLIENTS` env var (comma-separated) overrides the file. Behind a reverse proxy
+  the exporter only sees the proxy's address, so enforce the ACL at the proxy there.
+- **`allowed_hosts` / `allowed_ports`** — restrict URL-parameter mode (`/probe?host=...`): `host`
+  must `fullmatch` one of the regexes (literal string, no DNS) and the effective port (80/443 by
+  scheme when omitted) must be in `allowed_ports` (default `[80, 443]`); others get `403` and **no
+  OpenBao lookup happens**. Without this, anyone who can reach the port can make the exporter send
+  the credentials stored for an arbitrary hostname to that host. Devices under `devices:` are never
+  checked.
+
+```yaml
+allowed_clients:
+  - 10.1.2.3          # Prometheus server
+allowed_hosts:
+  - 'pwr[\w-]*\.(private\.)?ugent\.be'   # the shipped default
+```
+
+The bundled `config.example.yaml` (the image's built-in default) ships exactly this pattern, so
+URL mode only accepts `pwr*` hosts under `.ugent.be` / `.private.ugent.be` unless you override it.
+
 ## Development
 
 ```bash

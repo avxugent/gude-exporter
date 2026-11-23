@@ -45,15 +45,33 @@ Endpoints
                     interface).
 
 ``GET /healthz``
-    Liveness check; always returns ``200 OK``.
+    Liveness check; always returns ``200 OK``. Never restricted.
+
+Access control (all optional, all default to off with a startup warning)
+-----------------------------------------------------------------------
+
+``allowed_clients``
+    IPs / CIDRs (or the comma-separated ``GUDE_ALLOWED_CLIENTS`` env var, which
+    takes precedence) that may call ``/``, ``/probe`` and ``/metrics``; others
+    get ``403``. Behind a reverse proxy the source address is the proxy's, so
+    enforce the ACL at the proxy instead.
+
+``allowed_hosts`` / ``allowed_ports``
+    Restrict URL-parameter mode: ``host`` must ``fullmatch`` one of the regexes
+    (literal string, no DNS) and the effective port (80/443 by scheme when not
+    given) must be in ``allowed_ports`` (default ``[80, 443]``). Others get
+    ``403``. Config-file devices are never checked. Without this, any caller can
+    make the exporter send OpenBao credentials to an arbitrary host.
 """
 
 from __future__ import annotations
 
 import argparse
 import html
+import ipaddress
 import logging
 import os
+import re
 import signal
 import sys
 import threading
@@ -100,6 +118,14 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     "listen_host": "0.0.0.0",
     "listen_port": 9880,
     "log_level": "INFO",
+    # Source-IP allowlist (IPs/CIDRs) for the exporter's own endpoints, e.g. the
+    # Prometheus server. Empty = any client. Env GUDE_ALLOWED_CLIENTS overrides.
+    "allowed_clients": [],
+    # URL-parameter mode target restrictions. Empty allowed_hosts = unrestricted.
+    # When set, `host` must fullmatch one of the regexes and the effective port
+    # must be in allowed_ports. Config-file devices are never checked.
+    "allowed_hosts": [],
+    "allowed_ports": [80, 443],
     "devices": [],
 }
 
@@ -127,6 +153,29 @@ def load_config(path: str) -> dict[str, Any]:
         data = yaml.safe_load(fh) or {}
 
     cfg.update(data)
+
+    raw_clients = os.environ.get("GUDE_ALLOWED_CLIENTS")
+    if raw_clients:
+        raw_clients = [c.strip() for c in raw_clients.split(",") if c.strip()]
+    else:
+        raw_clients = cfg["allowed_clients"] or []
+    networks = []
+    for entry in raw_clients:
+        try:
+            networks.append(ipaddress.ip_network(str(entry), strict=False))
+        except ValueError as exc:
+            raise ValueError(f"Invalid allowed_clients entry {entry!r}: {exc}") from exc
+    cfg["allowed_clients"] = networks
+
+    # Compile allowed_hosts up front so a bad pattern fails at startup.
+    compiled = []
+    for pattern in cfg["allowed_hosts"] or []:
+        try:
+            compiled.append(re.compile(str(pattern)))
+        except re.error as exc:
+            raise ValueError(f"Invalid allowed_hosts regex {pattern!r}: {exc}") from exc
+    cfg["allowed_hosts"] = compiled
+    cfg["allowed_ports"] = [int(p) for p in (cfg["allowed_ports"] or [])]
 
     for i, dev in enumerate(cfg["devices"]):
         if "name" not in dev:
@@ -157,6 +206,39 @@ def _device_from_query_params(query_params: dict[str, list[str]]) -> dict[str, A
         "password": query_params.get("password", [_DEVICE_DEFAULTS["password"]])[0],
         "verify_tls": query_params.get("verify_tls", ["false"])[0].strip().lower() == "true",
     }
+
+
+def _target_allowed(cfg: dict[str, Any], device: dict[str, Any]) -> bool:
+    """
+    Check a URL-mode target against ``allowed_hosts``/``allowed_ports``.
+    Matches the literal host string given (no DNS resolution). The port is the
+    effective one (80/443 by scheme when not given). Always True when
+    ``allowed_hosts`` is empty.
+    """
+    if not cfg["allowed_hosts"]:
+        return True
+    port = device["port"] or (443 if device["scheme"] == "https" else 80)
+    return (
+        any(p.fullmatch(device["host"]) for p in cfg["allowed_hosts"])
+        and port in cfg["allowed_ports"]
+    )
+
+
+def _client_allowed(cfg: dict[str, Any], client_ip: str) -> bool:
+    """
+    Check the connecting client's address against ``allowed_clients``.
+    Always True when the list is empty; unparseable addresses are rejected.
+    """
+    if not cfg["allowed_clients"]:
+        return True
+    try:
+        addr = ipaddress.ip_address(client_ip.split("%", 1)[0])
+    except ValueError:
+        return False
+    # Dual-stack sockets report IPv4 clients as ::ffff:a.b.c.d.
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return any(addr.version == net.version and addr in net for net in cfg["allowed_clients"])
 
 
 def _resolve_credentials(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -194,6 +276,14 @@ def _make_handler(cfg: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+
+            # /healthz stays open for container/orchestrator liveness checks.
+            if parsed.path != "/healthz" and not _client_allowed(cfg, self.client_address[0]):
+                logger.warning(
+                    "Rejected request from %s (not in allowed_clients)", self.client_address[0]
+                )
+                self.send_error(403, "Client not allowed")
+                return
 
             if parsed.path == "/":
                 self._handle_index()
@@ -297,6 +387,14 @@ def _make_handler(cfg: dict[str, Any]) -> type[BaseHTTPRequestHandler]:
                 except ValueError as exc:
                     _PROBE_REQUESTS_TOTAL.labels(result="error").inc()
                     self.send_error(400, f"Invalid query parameter: {exc}")
+                    return
+                if not _target_allowed(cfg, devices[0]):
+                    _PROBE_REQUESTS_TOTAL.labels(result="error").inc()
+                    logger.warning(
+                        "Rejected URL-mode probe for %s (not in allowed_hosts/allowed_ports)",
+                        devices[0]["host"],
+                    )
+                    self.send_error(403, "Target host/port not allowed")
                     return
                 logger.debug(
                     "Probing device from URL parameters: %s (%s)",
@@ -454,6 +552,25 @@ def main(argv: list[str] | None = None) -> None:
             "Starting gude-exporter on %s:%d — no pre-configured devices; "
             "targets must be supplied via URL parameters",
             cfg["listen_host"], cfg["listen_port"],
+        )
+
+    if cfg["allowed_clients"]:
+        logger.info(
+            "Client IP allowlist enabled: %s (all endpoints except /healthz)",
+            ", ".join(str(n) for n in cfg["allowed_clients"]),
+        )
+    else:
+        logger.warning("allowed_clients NOT configured — any client IP may reach the endpoints")
+
+    if cfg["allowed_hosts"]:
+        logger.info(
+            "URL-mode targets restricted: %d host pattern(s), ports %s",
+            len(cfg["allowed_hosts"]), cfg["allowed_ports"],
+        )
+    else:
+        logger.warning(
+            "allowed_hosts NOT configured — /probe?host=... can target any host "
+            "and receive its OpenBao credentials"
         )
 
     logger.info(
