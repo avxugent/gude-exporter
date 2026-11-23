@@ -7,6 +7,8 @@ on:
   schedule:
     # Rebuild weekly on Monday at 04:00 UTC to pick up base-image updates.
     - cron: "0 4 * * 1"
+  # Manual runs from the Actions tab (also lets us publish without a new commit).
+  workflow_dispatch:
 
 jobs:
   # Never publish an image from a commit that fails lint, tests or security scans.
