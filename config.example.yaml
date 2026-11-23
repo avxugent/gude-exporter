@@ -9,6 +9,38 @@ listen_host: "0.0.0.0"
 # Port the HTTP server listens on.
 listen_port: 9880
 
+# ── Client IP allowlist ───────────────────────────────────────────────────────
+
+# Only these source IPs/CIDRs may call /, /probe and /metrics (others get 403;
+# /healthz stays open). Use this to limit access to your Prometheus server.
+# Env var GUDE_ALLOWED_CLIENTS (comma-separated) overrides. Behind a reverse
+# proxy the exporter sees the proxy's address, not the real client's — enforce
+# the ACL at the proxy in that case. Empty = any client (a warning is logged).
+#
+# allowed_clients:
+#   - 10.1.2.3
+#   - 10.1.0.0/24
+
+# ── URL-mode target restrictions ──────────────────────────────────────────────
+
+# Restrict which targets GET /probe?host=... may contact. Without this, any
+# caller can make the exporter connect to an arbitrary host and send it the
+# OpenBao credentials stored for that hostname. Regexes are fullmatch()ed against
+# the literal host string (no DNS resolution — anchor them tightly). Rejected
+# requests get 403. Empty/omitted = unrestricted (a warning is logged at startup).
+# Devices listed under `devices:` below are never checked.
+#
+#
+# Default: hosts named pwr* under .ugent.be or .private.ugent.be, e.g.
+# pwr-rack3.private.ugent.be, pwr12.ugent.be. Add literal IPs/hosts as extra
+# entries, e.g. '192\.168\.1\.10'.
+allowed_hosts:
+  - 'pwr[\w-]*\.(private\.)?ugent\.be'
+
+# Ports URL mode may target (only enforced when allowed_hosts is set). The
+# effective port is 80/443 by scheme when the request gives none.
+# allowed_ports: [80, 443]
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 
 # Minimum log level: DEBUG | INFO | WARNING | ERROR | CRITICAL

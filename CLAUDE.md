@@ -99,6 +99,18 @@ Four files under `gude_exporter/`, each with a single responsibility:
   loaded `cfg` dict), and `main()`/CLI argument parsing. Routes: `/` (HTML index), `/probe`,
   `/metrics`, `/healthz`.
 
+### Access control (RECORD-1536)
+
+Both optional, both default *off* (open + startup warning), same design as `lw3-exporter` /
+`extronsis-exporter`. Parsed once in `load_config` (compiled regexes / `ip_network` objects).
+- **`allowed_clients`** (`GUDE_ALLOWED_CLIENTS` env wins): `_client_allowed()` runs at the top of
+  `Handler.do_GET` against `self.client_address[0]` (IPv4-mapped IPv6 normalised); 403 on failure.
+  `/healthz` exempt. `X-Forwarded-For` is deliberately not trusted.
+- **`allowed_hosts` / `allowed_ports`** (default `[80, 443]`): `_target_allowed()` is checked in
+  `_handle_probe` for URL-parameter mode only, *before* `_resolve_credentials` so rejected targets
+  never trigger an OpenBao lookup. Effective port = given port, else 80/443 by scheme. Config-file
+  devices are never checked. No Basic auth (unlike the siblings) — not requested.
+
 ### The two probing modes (both always active, can combine)
 
 - **Config-file mode**: plain `GET /probe` scrapes every device listed under `devices:` in the
